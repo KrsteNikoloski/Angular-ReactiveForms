@@ -50,7 +50,7 @@ export class CustomerComponent implements OnInit {
 
     this.oldValues = { ...this.customerForm.value };
     this.customerForm.valueChanges.pipe(
-      debounceTime(1000)
+      debounceTime(100)
     ).subscribe(value => {
       const key = getChangePropertyName(this.oldValues, value);
       this.oldValues = { ...this.customerForm.value };
