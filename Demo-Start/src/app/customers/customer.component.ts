@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { FormGroup, FormBuilder, Validators, AbstractControl, ValidatorFn } from '@angular/forms';
+import { FormGroup, FormBuilder, Validators, AbstractControl, ValidatorFn, FormArray } from '@angular/forms';
 import { debounceTime } from 'rxjs/operators';
 
 import { Customer } from './customer';
@@ -14,6 +14,10 @@ export class CustomerComponent implements OnInit {
   customer = new Customer();
   oldValues: {};
   validationMessages = {};
+
+  get addresses(): FormArray {
+    return this.customerForm.get('addresses') as FormArray;
+  }
 
   private messages = {
     'emailGroup.email': {
@@ -41,7 +45,8 @@ export class CustomerComponent implements OnInit {
       phone: [''],
       notification: ['email'],
       rating: [null, ratingRange(1, 5)],
-      sendCatalog: true
+      sendCatalog: true,
+      addresses: this.fb.array([this.buildAddress()])
     });
 
     this.customerForm.get('notification').valueChanges.subscribe(
@@ -56,6 +61,21 @@ export class CustomerComponent implements OnInit {
       this.oldValues = { ...this.customerForm.value };
       this.setMessage(key);
     });
+  }
+
+  buildAddress(): FormGroup {
+    return this.fb.group({
+      addressType: 'home',
+      street1: '',
+      street2: '',
+      city: '',
+      state: '',
+      zip: ''
+    });
+  }
+
+  addAddress() {
+    this.addresses.push(this.buildAddress());
   }
 
   save() {
