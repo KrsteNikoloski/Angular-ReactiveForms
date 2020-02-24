@@ -1,15 +1,18 @@
-import { Component, OnInit } from '@angular/core';
-import { FormGroup, FormBuilder, Validators, AbstractControl, ValidatorFn, FormArray } from '@angular/forms';
+import { Component, OnInit, ElementRef, ViewChildren, AfterViewInit } from '@angular/core';
+import { FormGroup, FormBuilder, Validators, AbstractControl, ValidatorFn, FormArray, FormControlName } from '@angular/forms';
 import { debounceTime } from 'rxjs/operators';
 
 import { Customer } from './customer';
+import { Observable, fromEvent, merge } from 'rxjs';
 
 @Component({
   selector: 'app-customer',
   templateUrl: './customer.component.html',
   styleUrls: ['./customer.component.css']
 })
-export class CustomerComponent implements OnInit {
+export class CustomerComponent implements OnInit, AfterViewInit {
+  @ViewChildren(FormControlName, { read: ElementRef })
+  formInputElements: ElementRef[];
   customerForm: FormGroup;
   customer = new Customer();
   oldValues: {};
@@ -34,7 +37,7 @@ export class CustomerComponent implements OnInit {
 
   constructor(private fb: FormBuilder) { }
 
-  ngOnInit() {
+  ngOnInit(): void {
     this.customerForm = this.fb.group({
       firstName: ['', [Validators.required, Validators.minLength(3)]],
       lastName: ['', [Validators.required, Validators.maxLength(50)]],
@@ -48,14 +51,18 @@ export class CustomerComponent implements OnInit {
       sendCatalog: true,
       addresses: this.fb.array([this.buildAddress()])
     });
+  }
+
+  ngAfterViewInit(): void {
+    const controlBlurs: Observable<any>[] = this.formInputElements
+      .map((formControl: ElementRef) => fromEvent(formControl.nativeElement, 'blur'));
 
     this.customerForm.get('notification').valueChanges.subscribe(
       value => this.setNotification(value)
     );
 
-    this.oldValues = { ...this.customerForm.value };
-    this.customerForm.valueChanges.pipe(
-      debounceTime(100)
+    merge(this.customerForm.valueChanges, ...controlBlurs).pipe(
+      debounceTime(800)
     ).subscribe(value => {
       const key = getChangePropertyName(this.oldValues, value);
       this.oldValues = { ...this.customerForm.value };
@@ -117,7 +124,36 @@ export class CustomerComponent implements OnInit {
         }
       }
     }
+  }
 
+  processMessages(container: FormGroup): { [key: string]: string } {
+    const messages = {};
+
+    for (const controlKey in container.controls) {
+      if (container.controls.hasOwnProperty(controlKey)) {
+        const c = container.controls[controlKey];
+
+        if (c instanceof FormGroup) {
+          const childMessages = this.processMessages(c);
+          Object.assign(messages, childMessages);
+        } else {
+          if (this.validationMessages[controlKey]) {
+            messages[controlKey] = '';
+
+            if ((c.dirty || c.touched) && c.errors) {
+              Object.keys(c.errors).map(messageKey => {
+
+                if (this.validationMessages[controlKey][messageKey]) {
+                  messages[controlKey] += this.validationMessages[controlKey][messageKey] + ' ';
+                }
+              });
+            }
+          }
+        }
+      }
+    }
+
+    return messages;
   }
 }
 
